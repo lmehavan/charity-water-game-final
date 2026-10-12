@@ -1,54 +1,152 @@
-// Game configuration and state variables
-const GOAL_CANS = 25;        // Total items needed to collect
-let currentCans = 0;         // Current number of items collected
-let gameActive = false;      // Tracks if game is currently running
-let spawnInterval;          // Holds the interval for spawning items
+// One place to change the rules of the game.
+const GOAL_CANS = 20;
+const GAME_SECONDS = 30;
+const winningMessages = [
+  'You made a splash! Water Quest complete!',
+  'Wonderful collecting! You reached the goal!',
+  'You did it! Every drop counts!'
+];
+const losingMessages = [
+  'Keep going! Another water quest awaits.',
+  'So close to your next adventure! Try again.',
+  'Every attempt counts. Ready for another round?'
+];
 
-// Creates the 3x3 game grid where items will appear
+let currentCans = 0;
+let gameActive = false;
+let endTime = 0;
+let spawnInterval = null;
+let countdownInterval = null;
+const grid = document.querySelector('.game-grid');
+const scoreDisplay = document.getElementById('current-cans');
+const timerDisplay = document.getElementById('timer');
+const message = document.getElementById('achievements');
+const startButton = document.getElementById('start-game');
+const celebration = document.getElementById('celebration');
+
+// Keep the same buttons between spawns so keyboard focus is not lost.
 function createGrid() {
-  const grid = document.querySelector('.game-grid');
-  grid.innerHTML = ''; // Clear any existing grid cells
   for (let i = 0; i < 9; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'grid-cell'; // Each cell represents a grid square
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'grid-cell';
+    cell.addEventListener('click', () => collectItem(cell));
     grid.appendChild(cell);
   }
 }
 
-// Ensure the grid is created when the page loads
-createGrid();
-
-// Spawns a new item in a random grid cell
-function spawnWaterCan() {
-  if (!gameActive) return; // Stop if the game is not active
-  const cells = document.querySelectorAll('.grid-cell');
-  
-  // Clear all cells before spawning a new water can
-  cells.forEach(cell => (cell.innerHTML = ''));
-
-  // Select a random cell from the grid to place the water can
-  const randomCell = cells[Math.floor(Math.random() * cells.length)];
-
-  // Use a template literal to create the wrapper and water-can element
-  randomCell.innerHTML = `
-    <div class="water-can-wrapper">
-      <div class="water-can"></div>
-    </div>
-  `;
+function clearBoard() {
+  Array.from(grid.children).forEach((cell, index) => {
+    cell.replaceChildren();
+    cell.dataset.item = '';
+    cell.disabled = !gameActive;
+    cell.setAttribute('aria-label', `Square ${index + 1}: empty`);
+  });
 }
 
-// Initializes and starts a new game
+// Both Reset and game end cancel every running timer.
+function clearTimers() {
+  clearInterval(spawnInterval);
+  clearInterval(countdownInterval);
+  spawnInterval = null;
+  countdownInterval = null;
+}
+
+function collectItem(cell) {
+  if (!gameActive) return;
+  // Check the deadline here too: a delayed timer must not allow late points.
+  if (Date.now() >= endTime) {
+    endGame();
+    return;
+  }
+  const item = cell.dataset.item;
+  if (!item) return;
+  // Consume the item before scoring, so repeated clicks cannot collect it twice.
+  cell.dataset.item = '';
+  cell.replaceChildren();
+  cell.setAttribute('aria-label', 'Collected square: empty');
+  currentCans += item === 'can' ? 1 : -1;
+  scoreDisplay.textContent = currentCans;
+}
+
+function spawnWaterCan() {
+  if (!gameActive) return;
+  if (Date.now() >= endTime) {
+    endGame();
+    return;
+  }
+  clearBoard();
+  const cells = Array.from(grid.children);
+  const canIndex = Math.floor(Math.random() * cells.length);
+  const canCell = cells[canIndex];
+  canCell.dataset.item = 'can';
+  canCell.setAttribute('aria-label', `Square ${canIndex + 1}: collect yellow can, plus 1 point`);
+  const canImage = document.createElement('img');
+  canImage.src = 'img/water-can-transparent.png';
+  canImage.alt = '';
+  canImage.className = 'water-can';
+  canCell.appendChild(canImage);
+
+  // Choose a different square, so obstacles never cover a can.
+  const obstacleIndex = (canIndex + 1 + Math.floor(Math.random() * 8)) % 9;
+  const obstacleCell = cells[obstacleIndex];
+  obstacleCell.dataset.item = 'obstacle';
+  obstacleCell.setAttribute('aria-label', `Square ${obstacleIndex + 1}: obstacle, minus 1 point`);
+  obstacleCell.innerHTML = '<span class="obstacle" aria-hidden="true"><b>×</b>Obstacle −1</span>';
+}
+
+function updateTimer() {
+  // Use a real deadline instead of counting interval ticks (tabs can be delayed).
+  const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+  timerDisplay.textContent = secondsLeft;
+  if (secondsLeft === 0) endGame();
+}
+
 function startGame() {
-  if (gameActive) return; // Prevent starting a new game if one is already active
+  if (gameActive) return;
+  resetGame();
   gameActive = true;
-  createGrid(); // Set up the game grid
-  spawnInterval = setInterval(spawnWaterCan, 1000); // Spawn water cans every second
+  startButton.disabled = true;
+  message.textContent = 'Collect yellow cans. Avoid the red × obstacles!';
+  endTime = Date.now() + GAME_SECONDS * 1000;
+  spawnWaterCan();
+  // Forty opportunities in 30 seconds gives players room to reach 20.
+  spawnInterval = setInterval(spawnWaterCan, 750);
+  countdownInterval = setInterval(updateTimer, 100);
+  grid.children[0].focus();
 }
 
 function endGame() {
-  gameActive = false; // Mark the game as inactive
-  clearInterval(spawnInterval); // Stop spawning water cans
+  if (!gameActive) return;
+  gameActive = false;
+  clearTimers();
+  clearBoard();
+  timerDisplay.textContent = 0;
+  const won = currentCans >= GOAL_CANS;
+  const messages = won ? winningMessages : losingMessages;
+  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+  message.textContent = `${won ? 'You win!' : 'Time’s up!'} Final score: ${currentCans}. ${randomMessage}`;
+  celebration.hidden = !won;
+  startButton.disabled = false;
+  startButton.textContent = 'Play Again';
+  startButton.focus();
 }
 
-// Set up click handler for the start button
-document.getElementById('start-game').addEventListener('click', startGame);
+function resetGame() {
+  clearTimers();
+  gameActive = false;
+  endTime = 0;
+  currentCans = 0;
+  scoreDisplay.textContent = 0;
+  timerDisplay.textContent = GAME_SECONDS;
+  message.textContent = 'Press Start Game when you’re ready.';
+  celebration.hidden = true;
+  startButton.disabled = false;
+  startButton.textContent = 'Start Game';
+  clearBoard();
+}
+
+createGrid();
+resetGame();
+startButton.addEventListener('click', startGame);
+document.getElementById('reset-game').addEventListener('click', resetGame);

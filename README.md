@@ -45,3 +45,40 @@ These are the minimum requirements, but if you'd like an additional challenge go
 
 If you have any questions or need any assistance with your code, reach out to the HelpHub or attend a Drop-In Hour. You got this!!
 
+
+## Completed game
+
+Collect yellow cans for **+1 point** each and avoid red × obstacles, which cost
+**1 point** each (scores can go below zero). Each item can only be clicked once.
+New items appear every 0.75 seconds. Reach **20 points in 30 seconds** to win.
+The score updates immediately; scoring and spawning stop when time runs out.
+The game picks a random message from separate winning and losing arrays and
+shows a celebration for a win. Reset clears both timers and restores the initial
+screen. You can also use Tab and Enter/Space to play.
+
+## Preview in a Codespace
+
+1. Run **Terminal → Run Task → Preview Water Quest**, or run
+   `python3 -m http.server 8000` in the terminal.
+2. Open the **Ports** panel, find port **8000**, and select **Open in Browser**.
+3. To stop the preview server, press Ctrl+C in its terminal.
+
+This project uses plain HTML, CSS, and JavaScript with relative asset paths and
+no build step. For GitHub Pages, select the branch containing these files and
+**/ (root)** in the repository's **Settings → Pages** deployment settings.
+
+## Validation
+
+Browser checks used a controlled clock to verify the full 30-second round:
+
+- Clicking a can twice adds only 1 point; clicking an obstacle twice subtracts only 1.
+- The countdown updates, repeated starts do not restart it, and expiration clears the board.
+- A final score of 19 loses; 20 wins and shows the celebration.
+- Scores stay unchanged after expiration.
+- Reset during play stops spawning/countdown and restores score 0 and time 30.
+- Reset after a win removes the celebration; a new round works normally.
+- Enter activates a focused can button.
+- At 320px, 390px, and 1440px widths, there is no horizontal overflow,
+  images load, and all buttons are at least 44 × 44 CSS pixels.
+
+JavaScript syntax checking and editor diagnostics also passed.
